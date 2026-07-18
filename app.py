@@ -1,11 +1,10 @@
 import os
-import tempfile
 import numpy as np
 import tensorflow as tf
 import streamlit as st
 from PIL import Image
 
-from src.feature_extraction import build_feature_extractor, load_image
+from src.feature_extraction import build_feature_extractor
 from src.similarity_search import SimilaritySearch
 
 
@@ -75,14 +74,14 @@ def get_available_models() -> dict:
 
 
 def embed_uploaded_image(image: Image.Image, preprocess_fn, model) -> np.ndarray:
-    """Saves the uploaded PIL image to a temp file, runs it through the
-    feature extractor, and returns a single embedding vector."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-        image.resize((224, 224)).save(tmp.name)
-        img = load_image(tmp.name, preprocess_fn)
+    """Runs the uploaded PIL image through the feature extractor directly
+    in memory (no JPEG re-encode/reload), so preprocessing matches the
+    catalog embedding pipeline exactly (src/feature_extraction.py)."""
+    img = image.resize((224, 224))
+    arr = tf.keras.utils.img_to_array(img)
+    arr = preprocess_fn(arr)
 
-    embedding = model.predict(np.expand_dims(img, axis=0), verbose=0)[0]
-    os.remove(tmp.name)
+    embedding = model.predict(np.expand_dims(arr, axis=0), verbose=0)[0]
     return embedding
 
 
@@ -90,7 +89,10 @@ def render_recommendations(recommendations: list):
     cols = st.columns(len(recommendations)) if recommendations else []
     for col, item in zip(cols, recommendations):
         with col:
-            st.image(item["filepath"], use_container_width=True)
+            if os.path.exists(item["filepath"]):
+                st.image(item["filepath"], use_container_width=True)
+            else:
+                st.warning("Image file not found on disk.")
             st.write(f"**ID:** {item['id']}")
             st.write(f"**Similarity:** {item['similarity']:.3f}")
             st.write(f"**Category:** {item['category']}")
