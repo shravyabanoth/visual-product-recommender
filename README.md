@@ -38,12 +38,22 @@ network trades a small precision gap for a ~33× speedup over the baseline
 (and ~5× over Transfer Learning), thanks to its much lower-dimensional
 embeddings — a genuine precision-vs-latency trade-off rather than a single
 "best" model. See `results/precision_recall_comparison.png` and
-`sample_testcases/` for the full breakdown and example queries.
+`test_cases(outputs)/` for the full breakdown and example queries.
 
 > Recall@5 is uniformly low across all models by design: each category has
 > ~250 relevant items in the catalog, so retrieving only 5 items can never
 > recover more than ~2% of them. Precision@K and inference time are the
 > metrics that actually differentiate the three models here.
+
+---
+
+## Try it yourself
+
+- `sample_input_testcases/` — product photos (not part of the training/catalog
+  data) that can be uploaded directly into the app to test retrieval and
+  confirm the system generalizes to genuinely unseen images.
+- `test_cases(outputs)/` — screenshots showing example queries and their
+  top-K results across multiple categories, demonstrating the app in action.
 
 ---
 
@@ -87,7 +97,7 @@ visualproductrecommender/
 ├── app.py                          # Streamlit UI
 ├── data/
 │   ├── raw/                        # Original Kaggle dataset (images/ + styles.csv)
-│   ├── subset/                     # Full catalog subset (train + test)
+│   ├── subset/                     # Full catalog subset (train + test), used by the app
 │   │   ├── subset_metadata.csv
 │   │   ├── train_metadata.csv
 │   │   └── test_metadata.csv
@@ -98,12 +108,13 @@ visualproductrecommender/
 │   ├── transfer_embeddings.npz
 │   └── siamese_embeddings.npz
 ├── models/
-│   ├── siamese_embedding_model.keras
-│   └── transfer_learning_model.keras
+│   ├── siamese_embedding_model.keras     # tracked via Git LFS
+│   └── transfer_learning_model.keras     # tracked via Git LFS
 ├── results/
 │   ├── precision_recall_comparison.png
 │   └── triplet_loss.png
-├── sample_testcases/                # Example query → results screenshots
+├── sample_input_testcases/          # Product photos to upload and test yourself
+├── test_cases(outputs)/             # Screenshots of example queries + results
 ├── scripts/
 │   ├── prepare_data.py              # Step 1: build the subset + train/test split
 │   ├── train_siamese.py             # Step 2: train Siamese network
@@ -124,24 +135,32 @@ visualproductrecommender/
 ## Setup
 
 ```bash
-git clone <your-repo-url>
-cd visualproductrecommender
+git clone https://github.com/shravyabanoth/visual-product-recommender.git
+cd visual-product-recommender
 python -m venv venv
 venv\Scripts\activate        # Windows
 # source venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
 ```
 
-Download the [Fashion Product Images dataset](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-dataset)
-and place it at:
-```
-data/raw/images/       # all product images
-data/raw/styles.csv    # metadata
-```
+The full catalog images (`data/subset/`) and trained models (`models/*.keras`,
+via Git LFS) are already included in this repository, so the app runs
+out of the box — no need to download the raw Kaggle dataset unless you want
+to rebuild the subset from scratch (see below).
 
 ## Usage
 
-Run the full pipeline in order:
+**To just run the app** (uses the included catalog, embeddings, and models):
+```bash
+streamlit run app.py
+```
+Upload a photo (or use one from `sample_input_testcases/`), pick a model — or
+compare all three side by side — and view the top-K visually similar results
+with similarity scores.
+
+**To rebuild the full pipeline from scratch**, download the
+[Fashion Product Images dataset](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-dataset)
+and place it at `data/raw/images/` + `data/raw/styles.csv`, then run:
 
 ```bash
 # 1. Build the 8-category subset + stratified train/test split
@@ -160,14 +179,7 @@ python scripts/train_siamese.py
 
 # 5. Compare all three models on held-out test queries
 python scripts/run_evaluation.py
-
-# 6. Launch the interactive UI
-streamlit run app.py
 ```
-
-The Streamlit app lets you upload a product photo, pick a model (or compare
-all three side by side), and view the top-K visually similar results with
-similarity scores.
 
 ---
 
