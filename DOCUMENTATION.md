@@ -6,51 +6,30 @@ covers setup and results; this is more about the "how" and "why."
 
 ## Architecture
 
+**Offline pipeline** (run once, builds the cached embeddings):
+
+```mermaid
+flowchart TD
+    A[data/raw - Kaggle dataset] --> B[prepare_data.py<br/>stratified 80/20 split]
+    B --> C[data/subset<br/>+ train/test split per category]
+    C --> D[feature_extraction.py<br/>ResNet50, no training]
+    D --> E[baseline_embeddings.npz]
+    C --> F[transfer_learning.py<br/>fine-tune classifier]
+    F --> G[transfer_learning_model.keras]
+    G --> H[generate_transfer_embeddings.py]
+    H --> I[transfer_embeddings.npz]
+    C --> J[train_siamese.py<br/>triplet loss]
+    J --> K[siamese_embedding_model.keras]
+    K --> L[siamese_embeddings.npz]
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Offline Pipeline                        │
-│                                                                   │
-│  data/raw/  ──►  prepare_data.py  ──►  data/subset/ (+ train/    │
-│  (Kaggle)         (stratified          test split, per category) │
-│                    80/20 split)                                  │
-│                                                                   │
-│  data/subset/  ──►  feature_extraction.py  ──►  baseline_        │
-│  (all images)        (ResNet50, no training)     embeddings.npz  │
-│                                                                   │
-│  data/subset_train/  ──►  transfer_learning.py  ──►  transfer_   │
-│  (train split only)        (fine-tune classifier)    learning_   │
-│                                                        model.keras│
-│                        ──►  generate_transfer_embeddings.py  ──► │
-│                              (full catalog)          transfer_   │
-│                                                        embeddings │
-│                                                        .npz       │
-│                                                                   │
-│  data/subset_train/  ──►  train_siamese.py  ──►  siamese_        │
-│  (train split only,        (triplet loss)          embedding_    │
-│   triplets only)                                    model.keras  │
-│                        ──►  (full catalog)  ──►  siamese_         │
-│                                                    embeddings.npz │
-└─────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                          Online Pipeline                        │
-│                                                                   │
-│  User uploads image (app.py)                                     │
-│         │                                                         │
-│         ▼                                                         │
-│  embed_uploaded_image()  ──►  same preprocessing as offline       │
-│  (in-memory resize +          pipeline (resize → array →          │
-│   preprocess_input,            preprocess_input)                  │
-│   no disk round-trip)                                             │
-│         │                                                         │
-│         ▼                                                         │
-│  SimilaritySearch.query()  ──►  cosine_similarity() against       │
-│  (similarity_search.py)         the selected model's .npz         │
-│         │                                                         │
-│         ▼                                                         │
-│  Top-K results rendered with image, ID, similarity, category      │
-└─────────────────────────────────────────────────────────────────┘
+
+**Online pipeline** (runs every time someone uses the app):
+
+```mermaid
+flowchart TD
+    M[User uploads image - app.py] --> N[embed_uploaded_image<br/>in-memory resize + preprocess_input]
+    N --> O[SimilaritySearch.query<br/>cosine_similarity vs selected model's .npz]
+    O --> P[Top-K results: image, ID, similarity, category]
 ```
 
 The offline pipeline runs once (or whenever the dataset/models change) and
